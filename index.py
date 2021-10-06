@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
+import smtplib
 import sys
 import json
 import uuid
+from email.mime.text import MIMEText
+from email.header import Header
+
+
 import oss2
 import yaml
 import base64
@@ -153,8 +158,11 @@ def getUnSignedTasksAndSign(session, apis, user):
         exit(-1)
     # log(res.json())
     for i in range(0, len(res.json()['datas']['unSignedTasks'])):
-        # if '出校' in res.json()['datas']['unSignedTasks'][i]['taskName'] == False:
-        # if '入校' in res.json()['datas']['unSignedTasks'][i]['taskName'] == False:
+        # 出校扫码和入校扫码跳过
+        if '出校' in res.json()['datas']['unSignedTasks'][i]['taskName']:
+            continue
+        if '入校' in res.json()['datas']['unSignedTasks'][i]['taskName']:
+            continue
         latestTask = res.json()['datas']['unSignedTasks'][i]
         params = {
             'signInstanceWid': latestTask['signInstanceWid'],
@@ -315,34 +323,98 @@ def submitForm(session, user, form, apis):
     if message == 'SUCCESS':
         log('自动签到成功')
         # sendMessage('自动签到成功', user['email'])
+        notify(user)
     else:
         log('自动签到失败，原因是：' + message)
         # sendMessage('自动签到失败，原因是：' + message, user['email'])
         exit(-1)
 
+# 通知功能
+def notify(user):
+    sendmail(msg = '签到成功', email = user['email'])
+    sendServerChan(user)
+    sendTGBot(user)
+
+
+# 发送邮件
+def sendmail(msg, email):
+    mail_host = config['smtp_mail']['host']
+    mail_user = config['smtp_mail']['user']
+    mail_pass = config['smtp_mail']['password']
+    sender = config['smtp_mail']['sender']
+    port = config['smtp_mail']['port']
+    if mail_host is None or mail_user is None or mail_pass is None or sender is None or port is None or email is None:
+        return
+    receivers = email
+    message = MIMEText(msg, 'plain', 'utf-8')
+    message['From'] = Header(sender)
+    message['To'] = Header(email, 'utf-8')
+    subject = '今日校园签到成功'
+    message['Subject'] = Header(subject, 'utf-8')
+    try:
+        smtpObj = smtplib.SMTP()
+        smtpObj.connect(mail_host, port)
+        smtpObj.login(mail_user, mail_pass)
+        smtpObj.sendmail(sender, receivers, message.as_string())
+        print("邮件发送成功")
+    except smtplib.SMTPException:
+        print("Error: 无法发送邮件")
+
+
+# ServerChan推送
+def sendServerChan(user):
+    try:
+        ServerChan_Key = user['ServerChan']
+        if ServerChan_Key is None:
+            return
+        url = 'https://sctapi.ftqq.com/' + ServerChan_Key + '.send'
+        payload = {
+            'title': '今日校园签到成功',
+            'desp': '今日校园签到成功！'
+        }
+        requests.post(url=url, data=payload)
+    except:
+        print("Error: ServerChan推送失败")
+
+
+# TGBot 推送
+def sendTGBot(user):
+    TGBotToken = user['tgbot_token']
+    ChatID = user['tgbot_chatid']
+    if TGBotToken is None or ChatID is None:
+        return
+    try:
+        url = 'https://api.telegram.org/bot' + str(TGBotToken) +  '/sendMessage'
+        parm = {
+            'chat_id': ChatID,
+            'text': '今日校园签到成功'
+        }
+        requests.post(url, params=parm)
+    except:
+        print('Error: TGBot推送失败')
 
 # 发送邮件通知
-def sendMessage(msg, email):
-    send = email
-    if msg.count("未开始") > 0:
-        return ''
-    try:
-        if send != '':
-            log('正在发送邮件通知。。。')
-            log(getTimeStr())
-            #               sendMessageWeChat(msg + getTimeStr(), '今日校园自动签到结果通知')
-
-            res = requests.post(url='http://www.zimo.wiki:8080/mail-sender/sendMail',
-                                data={'title': '今日校园自动签到结果通知' + getTimeStr(), 'content': msg, 'to': send},
-                                verify=not debug)
-            code = res.json()['code']
-            if code == 0:
-                log('发送邮件通知成功。。。')
-            else:
-                log('发送邮件通知失败。。。')
-            log(res.json())
-    except Exception as e:
-        log("send failed")
+# def sendMessage(msg, email):
+#     send = email
+#     if msg.count("未开始") > 0:
+#         return ''
+#     try:
+#         if send != '':
+#             log('正在发送邮件通知。。。')
+#             log(getTimeStr())
+#             #               sendMessageWeChat(msg + getTimeStr(), '今日校园自动签到结果通知')
+#
+#             res = requests.post(url='http://www.zimo.wiki:8080/mail-sender/sendMail',
+#                                 data={'title': '今日校园自动签到结果通知' + getTimeStr(), 'content': msg, 'to': send},
+#                                 verify=not debug)
+#             code = res.json()['code']
+#             if code == 0:
+#                 log('发送邮件通知成功。。。')
+#             else:
+#                 log('发送邮件通知失败。。。')
+#             log(res.json())
+#     except Exception as e:
+#         log("send failed")
 
 
 # 主函数
