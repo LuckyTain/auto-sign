@@ -357,11 +357,13 @@ def submitForm(session, user, form, apis):
     if message == 'SUCCESS':
         log('自动签到成功')
         # sendMessage('自动签到成功', user['email'])
-        notify(user, message='今日校园签到成功')
+        if config['notify']['success']:
+            notify(user, message='今日校园签到成功')
     else:
         log('自动签到失败，原因是：' + message)
         # sendMessage('自动签到失败，原因是：' + message, user['email'])
-        notify(user, message='今日校园签到失败' + message)
+        if config['notify']['fail']:
+            notify(user, message='今日校园签到失败' + message)
         exit(-1)
 
 # 通知功能

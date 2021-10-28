@@ -57,3 +57,10 @@ smtp_mail:
   password:
   sender:
 
+# 通知配置
+notify:
+  # 成功通知
+  success: true
+  # 失败通知
+  fail: false
+
