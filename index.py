@@ -5,6 +5,8 @@ import json
 import uuid
 from email.mime.text import MIMEText
 from email.header import Header
+import hashlib
+from Cryptodome.Cipher import AES
 
 
 import oss2
@@ -291,15 +293,33 @@ def DESEncrypt(s, key='b3L26XNL'):
     return base64.b64encode(encrypt_str).decode()
 
 
+# AES 加密
+def AES_Encrypt(data, key='ytUQ7l2ZZu8mLvJZ'):
+    data = data + (16 - len(data.encode()) % 16) * chr(16 - len(data.encode()) % 16)
+    iv = b"\x01\x02\x03\x04\x05\x06\x07\x08\t\x01\x02\x03\x04\x05\x06\x07"
+    cipher = AES.new(key.encode("utf-8"), AES.MODE_CBC, iv=iv)
+    # 加密
+    ciphertext = cipher.encrypt(data.encode("utf-8"))
+    return base64.b64encode(ciphertext).decode()
+
+
+# Sign 加密
+def Sign_Encrypt(raw_sign_code_str):
+    m = hashlib.md5()
+    m.update(raw_sign_code_str.encode("utf-8"))
+    sign = m.hexdigest()
+    return sign
+
+
 # 提交签到任务
 def submitForm(session, user, form, apis):
     user = user['user']
     # Cpdaily-Extension
     extension = {
         "lon": user['lon'],
-        "model": "OPPO R11 Plus",
-        "appVersion": "8.1.14",
-        "systemVersion": "8.0",
+        "model": "MI 9",
+        "appVersion": "9.0.12",
+        "systemVersion": "11",
         "userId": user['username'],
         "systemName": "android",
         "lat": user['lat'],
@@ -317,27 +337,42 @@ def submitForm(session, user, form, apis):
         # 'Host': 'swu.cpdaily.com',
         'Connection': 'Keep-Alive'
     }
+    extra_form = {
+         "appVersion": "9.0.12",
+         "systemName": "android",
+         "bodyString": AES_Encrypt(json.dumps(form)),
+         "sign": Sign_Encrypt(json.dumps(form)),  # New unused encryption
+         "model": "MI 9",
+         "lon": user['lon'],
+         "calVersion": "firstv",
+         "systemVersion": "11",
+         "deviceId": str(uuid.uuid1()),
+         "userId": user['username'],
+         "version": "first_v2",
+         "lat": user['lat']
+         }
     res = session.post(url='https://{host}/wec-counselor-sign-apps/stu/sign/submitSign'.format(host=apis['host']),
-                       headers=headers, data=json.dumps(form), verify=not debug)
+                       headers=headers, data=json.dumps(extra_form), verify=not debug)
     message = res.json()['message']
     if message == 'SUCCESS':
         log('自动签到成功')
         # sendMessage('自动签到成功', user['email'])
-        notify(user)
+        notify(user, message='今日校园签到成功')
     else:
         log('自动签到失败，原因是：' + message)
         # sendMessage('自动签到失败，原因是：' + message, user['email'])
+        notify(user, message='今日校园签到失败' + message)
         exit(-1)
 
 # 通知功能
-def notify(user):
-    sendmail(msg = '签到成功', email = user['email'])
-    sendServerChan(user)
-    sendTGBot(user)
+def notify(user, message):
+    sendServerChan(user, message)
+    sendTGBot(user, message)
+    sendmail(msg=message, email=user['email'], subject='今日校园签到通知')
 
 
 # 发送邮件
-def sendmail(msg, email):
+def sendmail(msg, email, subject):
     mail_host = config['smtp_mail']['host']
     mail_user = config['smtp_mail']['user']
     mail_pass = config['smtp_mail']['password']
@@ -349,7 +384,7 @@ def sendmail(msg, email):
     message = MIMEText(msg, 'plain', 'utf-8')
     message['From'] = Header(sender)
     message['To'] = Header(email, 'utf-8')
-    subject = '今日校园签到成功'
+    # subject = '今日校园签到成功'
     message['Subject'] = Header(subject, 'utf-8')
     try:
         smtpObj = smtplib.SMTP()
@@ -362,15 +397,15 @@ def sendmail(msg, email):
 
 
 # ServerChan推送
-def sendServerChan(user):
+def sendServerChan(user, msg):
     try:
         ServerChan_Key = user['ServerChan']
         if ServerChan_Key is None:
             return
         url = 'https://sctapi.ftqq.com/' + ServerChan_Key + '.send'
         payload = {
-            'title': '今日校园签到成功',
-            'desp': '今日校园签到成功！'
+            'title': msg,
+            'desp': msg
         }
         requests.post(url=url, data=payload)
     except:
@@ -378,7 +413,7 @@ def sendServerChan(user):
 
 
 # TGBot 推送
-def sendTGBot(user):
+def sendTGBot(user, msg):
     TGBotToken = user['tgbot_token']
     ChatID = user['tgbot_chatid']
     if TGBotToken is None or ChatID is None:
@@ -387,7 +422,7 @@ def sendTGBot(user):
         url = 'https://api.telegram.org/bot' + str(TGBotToken) +  '/sendMessage'
         parm = {
             'chat_id': ChatID,
-            'text': '今日校园签到成功'
+            'text': msg
         }
         requests.post(url, params=parm)
     except:
