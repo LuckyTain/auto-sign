@@ -165,6 +165,9 @@ def getUnSignedTasksAndSign(session, apis, user):
             continue
         if '入校' in res.json()['datas']['unSignedTasks'][i]['taskName']:
             continue
+        # 只签每日健康打卡
+        if not '健康打卡' in res.json()['datas']['unSignedTasks'][i]['taskName']:
+            continue
         latestTask = res.json()['datas']['unSignedTasks'][i]
         params = {
             'signInstanceWid': latestTask['signInstanceWid'],
