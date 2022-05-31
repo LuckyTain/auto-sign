@@ -120,7 +120,6 @@ def getSession(user, apis):
                             verify=not debug)
 
     # cookieStr可以使用手动抓包获取到的cookie，有效期暂时未知，请自己测试
-    # cookieStr = str(res.json()['cookies'])
     cookieStr = str(res.json()['cookies'])
     # log(cookieStr) 调试时再输出
     if cookieStr == 'None':
@@ -158,7 +157,7 @@ def getUnSignedTasksAndSign(session, apis, user):
     if len(res.json()['datas']['unSignedTasks']) < 1:
         log('当前没有未签到任务')
         exit(-1)
-    # log(res.json())
+    log('AllTask: \n' + str(res.json()))
     for i in range(0, len(res.json()['datas']['unSignedTasks'])):
         # 出校扫码和入校扫码跳过
         if '出校' in res.json()['datas']['unSignedTasks'][i]['taskName']:
@@ -169,6 +168,25 @@ def getUnSignedTasksAndSign(session, apis, user):
         if not '健康打卡' in res.json()['datas']['unSignedTasks'][i]['taskName']:
             continue
         latestTask = res.json()['datas']['unSignedTasks'][i]
+        params = {
+            'signInstanceWid': latestTask['signInstanceWid'],
+            'signWid': latestTask['signWid']
+        }
+        task = getDetailTask(session, params, apis)
+        form = fillForm(task, session, user, apis)
+
+        submitForm(session, user, form, apis)
+
+#     新增功能: 请假情况下签到 leaveTasks
+    for i in range(0, len(res.json()['datas']['leaveTasks'])):
+        # 出校扫码和入校扫码跳过
+        if '出校' in res.json()['datas']['leaveTasks'][i]['taskName']:
+            continue
+        if '入校' in res.json()['datas']['leaveTasks'][i]['taskName']:
+            continue
+        if not '健康打卡' in res.json()['datas']['leaveTasks'][i]['taskName']:
+            continue
+        latestTask = res.json()['datas']['leaveTasks'][i]
         params = {
             'signInstanceWid': latestTask['signInstanceWid'],
             'signWid': latestTask['signWid']
