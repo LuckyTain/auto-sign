@@ -157,7 +157,7 @@ def getUnSignedTasksAndSign(session, apis, user):
     if len(res.json()['datas']['unSignedTasks']) < 1:
         log('当前没有未签到任务')
         exit(-1)
-    log('AllTask: \n' + str(res.json()))
+    # log('AllTask: \n' + str(res.json()))
     for i in range(0, len(res.json()['datas']['unSignedTasks'])):
         # 出校扫码和入校扫码跳过
         if '出校' in res.json()['datas']['unSignedTasks'][i]['taskName']:
