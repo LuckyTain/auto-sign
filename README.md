@@ -1,3 +1,6 @@
+![image](https://github.com/LuckyTain/auto-sign/assets/8756469/53ecacce-d38f-4860-8ce8-cd153b6ed390)
+
+
 # auto-sign
 
 # 禁止任何人使用此项目提供付费的代挂服务
